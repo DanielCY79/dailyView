@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.daniel.dailyView.config.AlphaFuturesProperties;
+import com.daniel.dailyView.domain.AlphaFuturesScreeningReport;
 import com.daniel.dailyView.dto.AlphaFuturesCandidateView;
 import com.daniel.dailyView.dto.AlphaFuturesScreenRequest;
 import com.daniel.dailyView.dto.AlphaFuturesScreenResponse;
@@ -22,14 +23,17 @@ public class AlphaFuturesSnapshotService {
 
     private final AlphaFuturesProperties properties;
     private final AlphaFuturesScreenerService alphaFuturesScreenerService;
+    private final AlphaFuturesPersistenceService alphaFuturesPersistenceService;
     private final AtomicReference<AlphaFuturesScreenResponse> latestSnapshot = new AtomicReference<>();
     private final Object refreshMonitor = new Object();
 
     public AlphaFuturesSnapshotService(
             AlphaFuturesProperties properties,
-            AlphaFuturesScreenerService alphaFuturesScreenerService) {
+            AlphaFuturesScreenerService alphaFuturesScreenerService,
+            AlphaFuturesPersistenceService alphaFuturesPersistenceService) {
         this.properties = properties;
         this.alphaFuturesScreenerService = alphaFuturesScreenerService;
+        this.alphaFuturesPersistenceService = alphaFuturesPersistenceService;
     }
 
     public AlphaFuturesScreenResponse getLatestSnapshot(boolean includeRejected) {
@@ -42,16 +46,9 @@ public class AlphaFuturesSnapshotService {
 
     public AlphaFuturesScreenResponse refreshDefaultSnapshot(String trigger) {
         synchronized (refreshMonitor) {
-            AlphaFuturesScreenRequest request = new AlphaFuturesScreenRequest(
-                    true,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-            );
-
-            AlphaFuturesScreenResponse response = alphaFuturesScreenerService.screen(request);
+            AlphaFuturesScreeningReport report = alphaFuturesScreenerService.buildReport(defaultRequest());
+            alphaFuturesPersistenceService.persistDefaultRun(trigger, report);
+            AlphaFuturesScreenResponse response = report.toResponse(true);
             latestSnapshot.set(response);
             log.info(
                     "Alpha futures snapshot refreshed. trigger={}, generatedAt={}, returnedCandidates={}, passedCandidates={}",
@@ -93,6 +90,17 @@ public class AlphaFuturesSnapshotService {
 
     public boolean isRefreshRunOnStartup() {
         return properties.isRefreshRunOnStartup();
+    }
+
+    private AlphaFuturesScreenRequest defaultRequest() {
+        return new AlphaFuturesScreenRequest(
+                true,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
     }
 
     private AlphaFuturesScreenResponse passedOnly(AlphaFuturesScreenResponse snapshot) {

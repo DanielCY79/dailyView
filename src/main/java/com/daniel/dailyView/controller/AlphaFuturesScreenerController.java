@@ -54,6 +54,16 @@ public class AlphaFuturesScreenerController {
             return alphaFuturesSnapshotService.getLatestSnapshot(includeRejected);
         }
 
+        if (forceRefresh && alphaFuturesSnapshotService.usesDefaultRules(
+                minOpenInterestUsdt,
+                maxMonthlyPumpPct,
+                minTop10HoldingRatioPct,
+                minWeeklyAverageOiRatio,
+                minWeeklyPeakOiRatio)) {
+            AlphaFuturesScreenResponse refreshed = alphaFuturesSnapshotService.refreshDefaultSnapshot("manual-force");
+            return includeRejected ? refreshed : alphaFuturesSnapshotService.getLatestSnapshot(false);
+        }
+
         return alphaFuturesScreenerService.screen(request);
     }
 }

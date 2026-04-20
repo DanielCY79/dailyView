@@ -34,7 +34,12 @@ public class AlphaTokenUniverseService {
 
     public List<AlphaFuturesUniverseEntry> loadMappedUniverse(List<AlphaToken> alphaTokens) {
         Map<String, FuturesContract> futuresContracts = binanceFuturesClient.fetchUsdtPerpetualContractsByBaseAsset();
+        return loadMappedUniverse(alphaTokens, futuresContracts);
+    }
 
+    public List<AlphaFuturesUniverseEntry> loadMappedUniverse(
+            List<AlphaToken> alphaTokens,
+            Map<String, FuturesContract> futuresContracts) {
         return alphaTokens.stream()
                 .filter(this::isEligibleAlphaToken)
                 .filter(token -> futuresContracts.containsKey(token.cexCoinName()))
