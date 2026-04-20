@@ -27,7 +27,11 @@ public class AlphaFuturesRefreshJob {
         if (!alphaFuturesSnapshotService.isRefreshEnabled()) {
             return;
         }
-        alphaFuturesSnapshotService.refreshDefaultSnapshot("scheduled-hourly");
+        try {
+            alphaFuturesSnapshotService.refreshDefaultSnapshot("scheduled-hourly");
+        } catch (RuntimeException ex) {
+            log.error("Scheduled alpha futures refresh failed.", ex);
+        }
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -36,6 +40,10 @@ public class AlphaFuturesRefreshJob {
             log.info("Skip alpha futures startup refresh because refresh is disabled or startup warmup is turned off.");
             return;
         }
-        alphaFuturesSnapshotService.refreshDefaultSnapshotIfEmpty("startup");
+        try {
+            alphaFuturesSnapshotService.refreshDefaultSnapshotIfEmpty("startup");
+        } catch (RuntimeException ex) {
+            log.error("Startup alpha futures refresh failed.", ex);
+        }
     }
 }

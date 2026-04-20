@@ -356,15 +356,19 @@ public class AlphaFuturesPersistenceService {
 
         for (AlphaFuturesCandidateReport candidateReport : candidateReports) {
             List<TopHolder> topHolders = candidateReport.topHolders();
-            for (int index = 0; index < topHolders.size(); index++) {
-                TopHolder topHolder = topHolders.get(index);
+            int persistedRank = 0;
+            for (TopHolder topHolder : topHolders) {
+                if (topHolder.walletAddress() == null || topHolder.walletAddress().isBlank()) {
+                    continue;
+                }
+                persistedRank++;
                 jdbcTemplate.update(sql, new MapSqlParameterSource()
                         .addValue("runId", runId)
                         .addValue("alphaId", candidateReport.universeEntry().alphaToken().alphaId())
                         .addValue("chainId", candidateReport.universeEntry().alphaToken().chainId())
                         .addValue("contractAddress", candidateReport.universeEntry().alphaToken().contractAddress())
                         .addValue("topN", properties.getTopHolderLimit())
-                        .addValue("rankNo", index + 1)
+                        .addValue("rankNo", persistedRank)
                         .addValue("walletAddress", topHolder.walletAddress())
                         .addValue("amount", topHolder.amount()));
             }
