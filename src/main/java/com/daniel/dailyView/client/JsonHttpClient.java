@@ -33,6 +33,23 @@ public class JsonHttpClient {
     }
 
     public <T> T get(String url, Map<String, String> headers, TypeReference<T> responseType) {
+        return exchange(url, "GET", headers, null, responseType);
+    }
+
+    public <T> T post(String url, Object requestBody, TypeReference<T> responseType) {
+        return post(url, Map.of(), requestBody, responseType);
+    }
+
+    public <T> T post(String url, Map<String, String> headers, Object requestBody, TypeReference<T> responseType) {
+        return exchange(url, "POST", headers, requestBody, responseType);
+    }
+
+    private <T> T exchange(
+            String url,
+            String method,
+            Map<String, String> headers,
+            Object requestBody,
+            TypeReference<T> responseType) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(REQUEST_TIMEOUT)
@@ -41,9 +58,8 @@ public class JsonHttpClient {
 
         headers.forEach(builder::header);
 
-        HttpRequest request = builder.GET().build();
-
         try {
+            HttpRequest request = buildRequest(builder, method, requestBody);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new ExternalDataAccessException(
@@ -58,5 +74,22 @@ public class JsonHttpClient {
         } catch (IOException ex) {
             throw new ExternalDataAccessException("External API request failed for " + url, ex);
         }
+    }
+
+    private HttpRequest buildRequest(HttpRequest.Builder builder, String method, Object requestBody)
+            throws JsonProcessingException {
+        if ("GET".equals(method)) {
+            return builder.GET().build();
+        }
+
+        if ("POST".equals(method)) {
+            String requestJson = objectMapper.writeValueAsString(requestBody);
+            return builder
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestJson))
+                    .build();
+        }
+
+        throw new IllegalArgumentException("Unsupported HTTP method: " + method);
     }
 }

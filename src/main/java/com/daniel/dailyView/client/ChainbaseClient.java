@@ -3,6 +3,7 @@ package com.daniel.dailyView.client;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -29,6 +30,24 @@ public class ChainbaseClient {
 
     public boolean supportsChain(String chainId) {
         return parseChainId(chainId).isPresent();
+    }
+
+    public TopHolderRequestSpec describeRequest(String chainId, String contractAddress, int limit) {
+        String resolvedChainId = parseChainId(chainId).isPresent()
+                ? Integer.toString(parseChainId(chainId).getAsInt())
+                : chainId;
+        Map<String, Object> requestParams = new LinkedHashMap<>();
+        requestParams.put("chain_id", resolvedChainId);
+        requestParams.put("contract_address", contractAddress);
+        requestParams.put("page", 1);
+        requestParams.put("limit", limit);
+        return new TopHolderRequestSpec(
+                supportsChain(chainId),
+                "chainbase",
+                "top-holders",
+                properties.getChainbaseBaseUrl() + TOP_HOLDERS_PATH,
+                requestParams
+        );
     }
 
     public List<TopHolder> fetchTopHolders(String chainId, String contractAddress, int limit) {

@@ -339,9 +339,7 @@ public class AlphaFuturesPersistenceService {
                     .addValue("denominatorSource", candidateReport.holderConcentrationMetrics().denominatorSource())
                     .addValue("supportedChain", candidateReport.supportedChain())
                     .addValue("scanStatus", resolveHolderScanStatus(candidateReport))
-                    .addValue("errorMessage", candidateReport.rejectReasons().isEmpty()
-                            ? null
-                            : String.join(",", candidateReport.rejectReasons())));
+                    .addValue("errorMessage", resolveHolderErrorMessage(candidateReport)));
         }
     }
 
@@ -412,15 +410,12 @@ public class AlphaFuturesPersistenceService {
                     report.generatedAt());
 
             String entityKey = candidateReport.universeEntry().alphaToken().alphaId();
-            insertPayload(runId, "chainbase", "top-holders", entityKey,
-                    properties.getChainbaseBaseUrl() + "/v1/token/top-holders",
-                    Map.of(
-                            "chain_id", candidateReport.universeEntry().alphaToken().chainId(),
-                            "contract_address", candidateReport.universeEntry().alphaToken().contractAddress(),
-                            "limit", properties.getTopHolderLimit()),
+            insertPayload(runId, candidateReport.holderSourceName(), candidateReport.holderEndpointName(), entityKey,
+                    candidateReport.holderRequestUri(),
+                    candidateReport.holderRequestParams(),
                     candidateReport.topHolders(),
                     candidateReport.supportedChain() && !candidateReport.topHolders().isEmpty(),
-                    candidateReport.supportedChain() ? "empty_top_holders" : "unsupported_chain_for_holder_scan",
+                    resolvePayloadErrorMessage(candidateReport),
                     report.generatedAt());
         }
     }
@@ -462,13 +457,39 @@ public class AlphaFuturesPersistenceService {
         if (!candidateReport.supportedChain()) {
             return "UNSUPPORTED_CHAIN";
         }
-        if (candidateReport.topHolders().isEmpty()) {
-            return "EMPTY";
-        }
         if (candidateReport.rejectReasons().contains("holder_concentration_unavailable")) {
             return "UNAVAILABLE";
         }
+        if (candidateReport.topHolders().isEmpty()) {
+            return "EMPTY";
+        }
         return "SUCCESS";
+    }
+
+    private String resolveHolderErrorMessage(AlphaFuturesCandidateReport candidateReport) {
+        if (!candidateReport.supportedChain()) {
+            return "unsupported_chain_for_holder_scan";
+        }
+        if (candidateReport.holderScanErrorMessage() != null && !candidateReport.holderScanErrorMessage().isBlank()) {
+            return trimMessage(candidateReport.holderScanErrorMessage());
+        }
+        if (candidateReport.topHolders().isEmpty()) {
+            return "empty_top_holders";
+        }
+        if (!candidateReport.rejectReasons().isEmpty()) {
+            return String.join(",", candidateReport.rejectReasons());
+        }
+        return null;
+    }
+
+    private String resolvePayloadErrorMessage(AlphaFuturesCandidateReport candidateReport) {
+        if (!candidateReport.supportedChain()) {
+            return "unsupported_chain_for_holder_scan";
+        }
+        if (candidateReport.holderScanErrorMessage() != null && !candidateReport.holderScanErrorMessage().isBlank()) {
+            return trimMessage(candidateReport.holderScanErrorMessage());
+        }
+        return "empty_top_holders";
     }
 
     private Timestamp toTimestamp(Instant instant) {

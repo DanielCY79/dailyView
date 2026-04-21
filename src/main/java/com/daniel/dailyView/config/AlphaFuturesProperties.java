@@ -10,6 +10,7 @@ public class AlphaFuturesProperties {
     private String binanceAlphaBaseUrl = "https://www.binance.com";
     private String binanceFuturesBaseUrl = "https://fapi.binance.com";
     private String chainbaseBaseUrl = "https://api.chainbase.online";
+    private String heliusRpcUrl = "";
     private String chainbaseApiKey = "demo";
     private BigDecimal minOpenInterestUsdt = new BigDecimal("5000000");
     private BigDecimal maxMonthlyPumpPct = new BigDecimal("500");
@@ -52,6 +53,14 @@ public class AlphaFuturesProperties {
 
     public void setChainbaseBaseUrl(String chainbaseBaseUrl) {
         this.chainbaseBaseUrl = chainbaseBaseUrl;
+    }
+
+    public String getHeliusRpcUrl() {
+        return heliusRpcUrl;
+    }
+
+    public void setHeliusRpcUrl(String heliusRpcUrl) {
+        this.heliusRpcUrl = heliusRpcUrl;
     }
 
     public String getChainbaseApiKey() {

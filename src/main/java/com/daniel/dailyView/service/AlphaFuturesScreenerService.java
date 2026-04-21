@@ -7,10 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.daniel.dailyView.client.BinanceFuturesClient;
-import com.daniel.dailyView.client.ChainbaseClient;
+import com.daniel.dailyView.client.TopHolderClient;
+import com.daniel.dailyView.client.TopHolderRequestSpec;
 import com.daniel.dailyView.config.AlphaFuturesProperties;
 import com.daniel.dailyView.domain.AlphaFuturesCandidateReport;
 import com.daniel.dailyView.domain.AlphaFuturesRules;
@@ -30,10 +33,12 @@ import com.daniel.dailyView.dto.AlphaFuturesScreenResponse;
 @Service
 public class AlphaFuturesScreenerService {
 
+    private static final Logger log = LoggerFactory.getLogger(AlphaFuturesScreenerService.class);
+
     private final AlphaFuturesProperties properties;
     private final AlphaTokenUniverseService alphaTokenUniverseService;
     private final BinanceFuturesClient binanceFuturesClient;
-    private final ChainbaseClient chainbaseClient;
+    private final TopHolderClient topHolderClient;
     private final PriceExplosionCalculator priceExplosionCalculator;
     private final OpenInterestAnomalyCalculator openInterestAnomalyCalculator;
     private final HolderConcentrationCalculator holderConcentrationCalculator;
@@ -42,14 +47,14 @@ public class AlphaFuturesScreenerService {
             AlphaFuturesProperties properties,
             AlphaTokenUniverseService alphaTokenUniverseService,
             BinanceFuturesClient binanceFuturesClient,
-            ChainbaseClient chainbaseClient,
+            TopHolderClient topHolderClient,
             PriceExplosionCalculator priceExplosionCalculator,
             OpenInterestAnomalyCalculator openInterestAnomalyCalculator,
             HolderConcentrationCalculator holderConcentrationCalculator) {
         this.properties = properties;
         this.alphaTokenUniverseService = alphaTokenUniverseService;
         this.binanceFuturesClient = binanceFuturesClient;
-        this.chainbaseClient = chainbaseClient;
+        this.topHolderClient = topHolderClient;
         this.priceExplosionCalculator = priceExplosionCalculator;
         this.openInterestAnomalyCalculator = openInterestAnomalyCalculator;
         this.holderConcentrationCalculator = holderConcentrationCalculator;
@@ -92,9 +97,14 @@ public class AlphaFuturesScreenerService {
         OpenInterestAnomalyMetrics openInterestAnomalyMetrics = new OpenInterestAnomalyMetrics(null, null);
         HolderConcentrationMetrics holderConcentrationMetrics =
                 new HolderConcentrationMetrics(null, null, null, false, "binanceTotalSupply");
+        String holderScanErrorMessage = null;
 
         String futuresSymbol = candidate.futuresContract().symbol();
-        boolean supportedChain = chainbaseClient.supportsChain(candidate.alphaToken().chainId());
+        TopHolderRequestSpec holderRequestSpec = topHolderClient.describeRequest(
+                candidate.alphaToken().chainId(),
+                candidate.alphaToken().contractAddress(),
+                properties.getTopHolderLimit());
+        boolean supportedChain = holderRequestSpec.supportedChain();
 
         try {
             currentOpenInterestUsdt = scale(
@@ -149,7 +159,7 @@ public class AlphaFuturesScreenerService {
             if (!supportedChain) {
                 rejectReasons.add("unsupported_chain_for_holder_scan");
             } else {
-                topHolders = chainbaseClient.fetchTopHolders(
+                topHolders = topHolderClient.fetchTopHolders(
                         candidate.alphaToken().chainId(),
                         candidate.alphaToken().contractAddress(),
                         properties.getTopHolderLimit());
@@ -168,6 +178,14 @@ public class AlphaFuturesScreenerService {
                 }
             }
         } catch (RuntimeException ex) {
+            holderScanErrorMessage = ex.getMessage();
+            log.warn(
+                    "Holder scan failed. chainId={}, contractAddress={}, source={}, endpoint={}, error={}",
+                    candidate.alphaToken().chainId(),
+                    candidate.alphaToken().contractAddress(),
+                    holderRequestSpec.sourceName(),
+                    holderRequestSpec.endpointName(),
+                    ex.getMessage());
             rejectReasons.add("holder_concentration_unavailable");
         }
 
@@ -180,6 +198,11 @@ public class AlphaFuturesScreenerService {
                 priceExplosionMetrics,
                 openInterestAnomalyMetrics,
                 scaleHolderMetrics(holderConcentrationMetrics),
+                holderRequestSpec.sourceName(),
+                holderRequestSpec.endpointName(),
+                holderRequestSpec.requestUri(),
+                holderRequestSpec.requestParams(),
+                holderScanErrorMessage,
                 supportedChain,
                 rejectReasons.isEmpty(),
                 List.copyOf(rejectReasons)

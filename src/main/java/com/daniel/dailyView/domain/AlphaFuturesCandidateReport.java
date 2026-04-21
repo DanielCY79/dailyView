@@ -2,6 +2,7 @@ package com.daniel.dailyView.domain;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import com.daniel.dailyView.dto.AlphaFuturesCandidateView;
 
@@ -14,6 +15,11 @@ public record AlphaFuturesCandidateReport(
         PriceExplosionMetrics priceExplosionMetrics,
         OpenInterestAnomalyMetrics openInterestAnomalyMetrics,
         HolderConcentrationMetrics holderConcentrationMetrics,
+        String holderSourceName,
+        String holderEndpointName,
+        String holderRequestUri,
+        Map<String, Object> holderRequestParams,
+        String holderScanErrorMessage,
         boolean supportedChain,
         boolean passed,
         List<String> rejectReasons
