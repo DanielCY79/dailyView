@@ -1,5 +1,7 @@
 package com.daniel.dailyView.config;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
@@ -14,10 +16,17 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class AppConfig {
 
     @Bean
-    public HttpClient httpClient() {
-        return HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+    public HttpClient httpClient(HttpClientProxyProperties proxyProperties) {
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15));
+
+        if (proxyProperties.isEnabled()) {
+            builder.proxy(ProxySelector.of(new InetSocketAddress(
+                    proxyProperties.getHost(),
+                    proxyProperties.getPort())));
+        }
+
+        return builder.build();
     }
 
     @Bean

@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Futures Monitor</title>
+    <style>
+        :root {
+            --bg: #09131a;
+            --bg-accent: #0f2430;
+            --panel: rgba(10, 24, 32, 0.78);
+            --panel-strong: rgba(14, 33, 43, 0.94);
+            --line: rgba(132, 196, 219, 0.16);
+            --text: #eff8fb;
+            --muted: #92afbc;
+            --accent: #6de0d3;
+            --accent-strong: #2ec4b6;
+            --warn: #f6b25f;
+            --danger: #ff7b72;
+            --ok: #7ce38b;
+            --shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Segoe UI Variable", "IBM Plex Sans", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 115, 133, 0.38), transparent 28%),
+                radial-gradient(circle at top right, rgba(246, 178, 95, 0.16), transparent 22%),
+                linear-gradient(160deg, #071017 0%, #0a151d 55%, #08121a 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 32px 32px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.22));
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            max-width: 1540px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .hero-card,
+        .shell,
+        .panel,
+        .run-item {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            backdrop-filter: blur(14px);
+            box-shadow: var(--shadow);
+        }
+
+        .hero-card {
+            padding: 24px;
+            border-radius: 28px;
+        }
+
+        .hero-card h1 {
+            margin: 0 0 12px;
+            font-family: "Bahnschrift", "Aptos Display", "Segoe UI Variable", sans-serif;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            letter-spacing: 0.02em;
+        }
+
+        .hero-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .button,
+        .ghost-button,
+        select {
+            border-radius: 999px;
+            border: 1px solid rgba(109, 224, 211, 0.28);
+            padding: 11px 16px;
+            font: inherit;
+        }
+
+        .button {
+            cursor: pointer;
+            color: #041317;
+            background: linear-gradient(135deg, #8ef0e0, #5ad7c7);
+            box-shadow: 0 12px 28px rgba(46, 196, 182, 0.22);
+        }
+
+        .ghost-button,
+        select {
+            color: var(--text);
+            background: rgba(12, 28, 38, 0.76);
+        }
+
+        .hero-side {
+            display: grid;
+            gap: 14px;
+        }
+
+        .hero-metric {
+            border-radius: 24px;
+            padding: 18px 20px;
+        }
+
+        .hero-metric .label {
+            color: var(--muted);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .hero-metric .value {
+            margin-top: 8px;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .shell {
+            display: grid;
+            grid-template-columns: 350px minmax(0, 1fr);
+            gap: 18px;
+            padding: 18px;
+            border-radius: 30px;
+        }
+
+        .sidebar,
+        .content {
+            min-width: 0;
+        }
+
+        .sidebar-header,
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .sidebar-header h2,
+        .section-title {
+            margin: 0;
+            font-size: 1rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .sidebar-meta {
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .run-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .run-item {
+            width: 100%;
+            border-radius: 22px;
+            padding: 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+        }
+
+        .run-item:hover,
+        .run-item.active {
+            transform: translateY(-1px);
+            border-color: rgba(109, 224, 211, 0.45);
+            background: rgba(13, 31, 41, 0.95);
+        }
+
+        .run-item strong {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        .run-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-up,
+        .status-success {
+            color: var(--ok);
+            border-color: rgba(124, 227, 139, 0.28);
+            background: rgba(124, 227, 139, 0.08);
+        }
+
+        .status-running {
+            color: var(--warn);
+            border-color: rgba(246, 178, 95, 0.28);
+            background: rgba(246, 178, 95, 0.08);
+        }
+
+        .status-down,
+        .status-failed {
+            color: var(--danger);
+            border-color: rgba(255, 123, 114, 0.28);
+            background: rgba(255, 123, 114, 0.08);
+        }
+
+        .content {
+            display: grid;
+            gap: 16px;
+        }
+
+        .panel {
+            border-radius: 24px;
+            padding: 18px;
+        }
+
+        .overview-grid,
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .stat-card {
+            border-radius: 20px;
+            padding: 16px;
+            background: linear-gradient(180deg, rgba(16, 36, 47, 0.88), rgba(11, 24, 32, 0.94));
+            border: 1px solid rgba(132, 196, 219, 0.12);
+        }
+
+        .stat-card .label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .stat-card .value {
+            margin-top: 10px;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .meta-item {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(7, 19, 26, 0.72);
+            border: 1px solid rgba(132, 196, 219, 0.12);
+        }
+
+        .meta-item .label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        .rule-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .rule-chip {
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.88rem;
+            background: rgba(9, 20, 27, 0.88);
+            border: 1px solid rgba(132, 196, 219, 0.14);
+            color: var(--muted);
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border-radius: 20px;
+            border: 1px solid rgba(132, 196, 219, 0.12);
+            background: rgba(6, 15, 20, 0.72);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 880px;
+        }
+
+        th,
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(132, 196, 219, 0.08);
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.9rem;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: rgba(8, 21, 28, 0.95);
+            position: sticky;
+            top: 0;
+        }
+
+        td code,
+        .mono {
+            font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+            font-size: 0.84rem;
+        }
+
+        .reason-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .reason-pill {
+            border-radius: 999px;
+            padding: 5px 10px;
+            background: rgba(255, 123, 114, 0.12);
+            border: 1px solid rgba(255, 123, 114, 0.16);
+            color: #ffb7af;
+            font-size: 0.78rem;
+        }
+
+        .payload-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .payload-card {
+            border-radius: 20px;
+            border: 1px solid rgba(132, 196, 219, 0.14);
+            background: rgba(7, 18, 24, 0.86);
+            padding: 16px;
+        }
+
+        .payload-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .payload-title {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .payload-meta {
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+
+        details {
+            margin-top: 10px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(132, 196, 219, 0.12);
+            background: rgba(8, 18, 24, 0.9);
+        }
+
+        summary {
+            cursor: pointer;
+            padding: 12px 14px;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        pre {
+            margin: 0;
+            padding: 14px;
+            overflow: auto;
+            color: #d6f2fb;
+            font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            background: rgba(4, 11, 16, 0.96);
+        }
+
+        .empty,
+        .error {
+            padding: 22px;
+            border-radius: 18px;
+            color: var(--muted);
+            background: rgba(10, 22, 29, 0.88);
+            border: 1px dashed rgba(132, 196, 219, 0.18);
+        }
+
+        .error {
+            color: #ffb7af;
+            border-color: rgba(255, 123, 114, 0.24);
+        }
+
+        @media (max-width: 1200px) {
+            .shell,
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .overview-grid,
+            .stats-grid,
+            .meta-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .page {
+                padding: 18px 14px 24px;
+            }
+
+            .overview-grid,
+            .stats-grid,
+            .meta-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <section class="hero">
+        <div class="hero-card">
+            <h1>Alpha Futures Run Monitor</h1>
+            <p>查看每一轮筛选任务的运行快照、候选结果、Top 持仓地址和外部接口原始回包。页面直接读取数据库中的持久化记录，适合排查规则变化、代理稳定性和数据源异常。</p>
+            <div class="hero-actions">
+                <button id="refreshRunsButton" class="button" type="button">刷新最近运行</button>
+                <label class="ghost-button" for="limitSelect">
+                    最近轮次
+                    <select id="limitSelect">
+                        <option value="8">8</option>
+                        <option value="12" selected>12</option>
+                        <option value="24">24</option>
+                        <option value="48">48</option>
+                    </select>
+                </label>
+                <a class="ghost-button" href="/actuator/health/connectivity" target="_blank" rel="noreferrer">健康检查</a>
+                <a class="ghost-button" href="/api/screener/alpha-futures?includeRejected=true" target="_blank" rel="noreferrer">当前筛选 API</a>
+            </div>
+        </div>
+        <div class="hero-side">
+            <div class="hero-card hero-metric">
+                <div class="label">最近一轮状态</div>
+                <div class="value" id="latestRunStatus">等待加载</div>
+            </div>
+            <div class="hero-card hero-metric">
+                <div class="label">最近一轮开始时间</div>
+                <div class="value" id="latestRunStartedAt">-</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="shell">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>运行记录</h2>
+                <div class="sidebar-meta" id="runCountLabel">0 轮</div>
+            </div>
+            <div id="runList" class="run-list"></div>
+        </aside>
+
+        <main class="content">
+            <section class="panel">
+                <div class="section-header">
+                    <h2 class="section-title">运行总览</h2>
+                    <div id="detailStatusPill" class="status-pill">未选择</div>
+                </div>
+                <div id="detailOverview" class="overview-grid"></div>
+                <div id="detailMeta" class="meta-grid"></div>
+                <div id="ruleChips" class="rule-grid"></div>
+                <div id="detailError"></div>
+            </section>
+
+            <section class="panel">
+                <div class="section-header">
+                    <h2 class="section-title">候选结果</h2>
+                    <div class="sidebar-meta" id="candidateCountLabel">0 条</div>
+                </div>
+                <div id="candidateSection"></div>
+            </section>
+
+            <section class="panel">
+                <div class="section-header">
+                    <h2 class="section-title">Top 持仓地址</h2>
+                    <div class="sidebar-meta" id="holderCountLabel">0 条</div>
+                </div>
+                <div id="holderSection"></div>
+            </section>
+
+            <section class="panel">
+                <div class="section-header">
+                    <h2 class="section-title">接口原始回包</h2>
+                    <div class="sidebar-meta" id="payloadCountLabel">0 条</div>
+                </div>
+                <div id="payloadSection" class="payload-list"></div>
+            </section>
+        </main>
+    </section>
+</div>
+
+<script>
+    const state = {
+        runs: [],
+        activeRunId: null,
+        limit: 12,
+    };
+
+    const runListEl = document.getElementById("runList");
+    const runCountLabelEl = document.getElementById("runCountLabel");
+    const latestRunStatusEl = document.getElementById("latestRunStatus");
+    const latestRunStartedAtEl = document.getElementById("latestRunStartedAt");
+    const detailStatusPillEl = document.getElementById("detailStatusPill");
+    const detailOverviewEl = document.getElementById("detailOverview");
+    const detailMetaEl = document.getElementById("detailMeta");
+    const ruleChipsEl = document.getElementById("ruleChips");
+    const detailErrorEl = document.getElementById("detailError");
+    const candidateSectionEl = document.getElementById("candidateSection");
+    const holderSectionEl = document.getElementById("holderSection");
+    const payloadSectionEl = document.getElementById("payloadSection");
+    const candidateCountLabelEl = document.getElementById("candidateCountLabel");
+    const holderCountLabelEl = document.getElementById("holderCountLabel");
+    const payloadCountLabelEl = document.getElementById("payloadCountLabel");
+    const refreshRunsButtonEl = document.getElementById("refreshRunsButton");
+    const limitSelectEl = document.getElementById("limitSelect");
+
+    refreshRunsButtonEl.addEventListener("click", () => loadRuns(true));
+    limitSelectEl.addEventListener("change", event => {
+        state.limit = Number(event.target.value || 12);
+        loadRuns(true);
+    });
+
+    async function loadRuns(resetSelection) {
+        renderRunListLoading();
+        try {
+            const response = await fetch(`/api/monitor/alpha-futures/runs?limit=${state.limit}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            state.runs = await response.json();
+            runCountLabelEl.textContent = `${state.runs.length} 轮`;
+
+            const latestRun = state.runs[0];
+            latestRunStatusEl.textContent = latestRun ? latestRun.status : "暂无数据";
+            latestRunStartedAtEl.textContent = latestRun ? formatDate(latestRun.startedAt) : "-";
+
+            const urlRunId = Number(new URL(window.location.href).searchParams.get("runId"));
+            const hasPinnedRun = Number.isFinite(urlRunId) && urlRunId > 0;
+
+            if (resetSelection || !state.activeRunId || !state.runs.some(run => run.runId === state.activeRunId)) {
+                state.activeRunId = hasPinnedRun && state.runs.some(run => run.runId === urlRunId)
+                    ? urlRunId
+                    : (latestRun ? latestRun.runId : null);
+            }
+
+            renderRunList();
+
+            if (state.activeRunId) {
+                await loadRunDetail(state.activeRunId);
+            } else {
+                renderEmptyDetail();
+            }
+        } catch (error) {
+            renderError(runListEl, `加载运行列表失败：${escapeHtml(error.message)}`);
+            renderEmptyDetail("当前还没有任何运行记录。");
+        }
+    }
+
+    async function loadRunDetail(runId) {
+        state.activeRunId = runId;
+        const url = new URL(window.location.href);
+        url.searchParams.set("runId", String(runId));
+        window.history.replaceState({}, "", url);
+        renderRunList();
+        renderDetailLoading();
+
+        try {
+            const response = await fetch(`/api/monitor/alpha-futures/runs/${runId}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const detail = await response.json();
+            renderDetail(detail);
+        } catch (error) {
+            renderEmptyDetail();
+            renderError(detailErrorEl, `加载运行详情失败：${escapeHtml(error.message)}`);
+        }
+    }
+
+    function renderRunListLoading() {
+        runListEl.innerHTML = '<div class="empty">正在加载最近运行记录...</div>';
+    }
+
+    function renderRunList() {
+        if (!state.runs.length) {
+            runListEl.innerHTML = '<div class="empty">还没有可展示的运行记录。</div>';
+            return;
+        }
+
+        runListEl.innerHTML = state.runs.map(run => `
+            <button class="run-item ${run.runId === state.activeRunId ? "active" : ""}" type="button" data-run-id="${run.runId}">
+                <strong>#${run.runId} ${escapeHtml(run.triggerType || "-")}</strong>
+                <div style="margin-bottom: 10px;">${statusPill(run.status)}</div>
+                <div class="run-grid">
+                    <span>开始</span>
+                    <span>${escapeHtml(formatDate(run.startedAt))}</span>
+                    <span>通过</span>
+                    <span>${escapeHtml(formatCount(run.passedCandidates))}</span>
+                    <span>映射</span>
+                    <span>${escapeHtml(formatCount(run.mappedCandidates))}</span>
+                    <span>耗时</span>
+                    <span>${escapeHtml(formatDuration(run.durationMs))}</span>
+                </div>
+            </button>
+        `).join("");
+
+        for (const button of runListEl.querySelectorAll("[data-run-id]")) {
+            button.addEventListener("click", () => loadRunDetail(Number(button.dataset.runId)));
+        }
+    }
+
+    function renderDetailLoading() {
+        detailStatusPillEl.className = "status-pill";
+        detailStatusPillEl.textContent = "正在加载";
+        detailOverviewEl.innerHTML = '<div class="empty">正在加载本轮统计...</div>';
+        detailMetaEl.innerHTML = "";
+        ruleChipsEl.innerHTML = "";
+        detailErrorEl.innerHTML = "";
+        candidateSectionEl.innerHTML = '<div class="empty">正在加载候选结果...</div>';
+        holderSectionEl.innerHTML = '<div class="empty">正在加载持仓明细...</div>';
+        payloadSectionEl.innerHTML = '<div class="empty">正在加载接口回包...</div>';
+        candidateCountLabelEl.textContent = "0 条";
+        holderCountLabelEl.textContent = "0 条";
+        payloadCountLabelEl.textContent = "0 条";
+    }
+
+    function renderEmptyDetail(message = "选择左侧任意一轮运行后，这里会展示本轮抓到的数据。") {
+        detailStatusPillEl.className = "status-pill";
+        detailStatusPillEl.textContent = "未选择";
+        detailOverviewEl.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+        detailMetaEl.innerHTML = "";
+        ruleChipsEl.innerHTML = "";
+        detailErrorEl.innerHTML = "";
+        candidateSectionEl.innerHTML = "";
+        holderSectionEl.innerHTML = "";
+        payloadSectionEl.innerHTML = "";
+        candidateCountLabelEl.textContent = "0 条";
+        holderCountLabelEl.textContent = "0 条";
+        payloadCountLabelEl.textContent = "0 条";
+    }
+
+    function renderDetail(detail) {
+        const run = detail.run;
+        const stats = detail.stats;
+        const rules = run.rules && typeof run.rules === "object" ? Object.entries(run.rules) : [];
+
+        detailStatusPillEl.className = `status-pill ${statusClass(run.status)}`;
+        detailStatusPillEl.textContent = run.status || "UNKNOWN";
+
+        detailOverviewEl.innerHTML = `
+            <div class="stat-card"><div class="label">Run ID</div><div class="value">#${escapeHtml(String(run.runId))}</div></div>
+            <div class="stat-card"><div class="label">通过候选</div><div class="value">${escapeHtml(formatCount(run.passedCandidates))}</div></div>
+            <div class="stat-card"><div class="label">被拒候选</div><div class="value">${escapeHtml(formatCount(run.rejectedCandidates))}</div></div>
+            <div class="stat-card"><div class="label">外部回包</div><div class="value">${escapeHtml(formatCount(stats.payloadCount))}</div></div>
+        `;
+
+        detailMetaEl.innerHTML = `
+            ${metaItem("任务名", run.jobName)}
+            ${metaItem("触发方式", run.triggerType)}
+            ${metaItem("开始时间", formatDate(run.startedAt))}
+            ${metaItem("结束时间", formatDate(run.endedAt))}
+            ${metaItem("执行耗时", formatDuration(run.durationMs))}
+            ${metaItem("Alpha 快照", formatCount(stats.alphaTokenSnapshotCount))}
+            ${metaItem("合约快照", formatCount(stats.futuresContractSnapshotCount))}
+            ${metaItem("OI 点数", formatCount(stats.openInterestPointCount))}
+            ${metaItem("K 线点数", formatCount(stats.priceKlineCount))}
+            ${metaItem("结果条数", formatCount(stats.screenResultCount))}
+            ${metaItem("持仓地址", formatCount(stats.holderDetailCount))}
+            ${metaItem("映射候选", formatCount(run.mappedCandidates))}
+        `;
+
+        ruleChipsEl.innerHTML = rules.length
+            ? rules.map(([key, value]) => `<div class="rule-chip">${escapeHtml(humanizeKey(key))}: ${escapeHtml(formatValue(value))}</div>`).join("")
+            : '<div class="empty">本轮没有存规则快照。</div>';
+
+        detailErrorEl.innerHTML = run.errorMessage
+            ? `<div class="error">本轮错误：${escapeHtml(run.errorMessage)}</div>`
+            : "";
+
+        renderCandidates(detail.candidates || []);
+        renderHolders(detail.topHolders || []);
+        renderPayloads(detail.payloads || []);
+    }
+
+    function renderCandidates(candidates) {
+        candidateCountLabelEl.textContent = `${candidates.length} 条`;
+        if (!candidates.length) {
+            candidateSectionEl.innerHTML = '<div class="empty">本轮没有筛选结果明细。</div>';
+            return;
+        }
+
+        candidateSectionEl.innerHTML = `
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>交易对</th>
+                        <th>Alpha 币种</th>
+                        <th>当前 OI</th>
+                        <th>月涨幅</th>
+                        <th>Top10 占比</th>
+                        <th>周均 OI 比</th>
+                        <th>周峰值 OI 比</th>
+                        <th>通过</th>
+                        <th>拒绝原因</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    ${candidates.map(candidate => `
+                        <tr>
+                            <td><strong>${escapeHtml(candidate.futuresSymbol || "-")}</strong><br><span class="mono">${escapeHtml(candidate.contractAddress || "-")}</span></td>
+                            <td>${escapeHtml(candidate.alphaSymbol || candidate.cexCoinName || candidate.alphaId || "-")}<br><span class="mono">${escapeHtml(candidate.chainId || "-")}</span></td>
+                            <td>${escapeHtml(formatDecimal(candidate.currentOpenInterestUsdt, 2))}</td>
+                            <td>${escapeHtml(formatDecimal(candidate.monthlyPumpPct, 2))}%</td>
+                            <td>${escapeHtml(formatDecimal(candidate.top10HoldingRatioPct, 2))}%</td>
+                            <td>${escapeHtml(formatDecimal(candidate.recentWeekAverageOiRatio, 3))}</td>
+                            <td>${escapeHtml(formatDecimal(candidate.recentWeekPeakOiRatio, 3))}</td>
+                            <td>${statusPill(candidate.passed ? "SUCCESS" : "FAILED")}</td>
+                            <td>${renderReasons(candidate.rejectReasons || [])}</td>
+                        </tr>
+                    `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderHolders(holders) {
+        holderCountLabelEl.textContent = `${holders.length} 条`;
+        if (!holders.length) {
+            holderSectionEl.innerHTML = '<div class="empty">本轮没有 Top 持仓地址明细。</div>';
+            return;
+        }
+
+        holderSectionEl.innerHTML = `
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>交易对</th>
+                        <th>Rank</th>
+                        <th>地址</th>
+                        <th>数量</th>
+                        <th>链信息</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    ${holders.map(holder => `
+                        <tr>
+                            <td><strong>${escapeHtml(holder.futuresSymbol || holder.alphaSymbol || holder.alphaId || "-")}</strong><br>${escapeHtml(holder.alphaSymbol || "-")}</td>
+                            <td>Top ${escapeHtml(String(holder.topN))} / #${escapeHtml(String(holder.rankNo))}</td>
+                            <td><span class="mono">${escapeHtml(holder.walletAddress || "-")}</span></td>
+                            <td>${escapeHtml(formatDecimal(holder.amount, 6))}</td>
+                            <td>${escapeHtml(holder.chainId || "-")}<br><span class="mono">${escapeHtml(holder.contractAddress || "-")}</span></td>
+                        </tr>
+                    `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderPayloads(payloads) {
+        payloadCountLabelEl.textContent = `${payloads.length} 条`;
+        if (!payloads.length) {
+            payloadSectionEl.innerHTML = '<div class="empty">本轮还没有接口回包归档。</div>';
+            return;
+        }
+
+        payloadSectionEl.innerHTML = payloads.map(payload => `
+            <article class="payload-card">
+                <div class="payload-head">
+                    <div>
+                        <div class="payload-title">${escapeHtml(payload.sourceName || "-")} / ${escapeHtml(payload.endpointName || "-")}</div>
+                        <div class="payload-meta">实体键：<span class="mono">${escapeHtml(payload.entityKey || "-")}</span></div>
+                    </div>
+                    <div style="display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+                        ${statusPill(payload.success ? "SUCCESS" : "FAILED")}
+                        <span class="payload-meta">${escapeHtml(formatDate(payload.collectedAt))}</span>
+                    </div>
+                </div>
+                <div class="payload-meta">URI：<span class="mono">${escapeHtml(payload.requestUri || "-")}</span></div>
+                ${payload.errorMessage ? `<div class="error" style="margin-top:10px;">${escapeHtml(payload.errorMessage)}</div>` : ""}
+                <details>
+                    <summary>请求参数</summary>
+                    <pre>${escapeHtml(formatJson(payload.requestParams))}</pre>
+                </details>
+                <details>
+                    <summary>响应报文</summary>
+                    <pre>${escapeHtml(formatJson(payload.responseBody))}</pre>
+                </details>
+            </article>
+        `).join("");
+    }
+
+    function metaItem(label, value) {
+        return `
+            <div class="meta-item">
+                <span class="label">${escapeHtml(label)}</span>
+                <span>${escapeHtml(value || "-")}</span>
+            </div>
+        `;
+    }
+
+    function renderReasons(reasons) {
+        if (!reasons.length) {
+            return '<span style="color:var(--muted);">-</span>';
+        }
+        return `<div class="reason-list">${reasons.map(reason => `<span class="reason-pill">${escapeHtml(reason)}</span>`).join("")}</div>`;
+    }
+
+    function renderError(target, message) {
+        target.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    function statusPill(status) {
+        return `<span class="status-pill ${statusClass(status)}">${escapeHtml(status || "UNKNOWN")}</span>`;
+    }
+
+    function statusClass(status) {
+        const normalized = String(status || "").toLowerCase();
+        if (normalized === "up" || normalized === "success") {
+            return "status-success";
+        }
+        if (normalized === "running") {
+            return "status-running";
+        }
+        if (normalized === "down" || normalized === "failed") {
+            return "status-failed";
+        }
+        return "";
+    }
+
+    function formatDate(value) {
+        if (!value) {
+            return "-";
+        }
+        return new Intl.DateTimeFormat("zh-CN", {
+            dateStyle: "medium",
+            timeStyle: "medium",
+            hour12: false,
+        }).format(new Date(value));
+    }
+
+    function formatDuration(value) {
+        if (value === null || value === undefined) {
+            return "-";
+        }
+        return `${value} ms`;
+    }
+
+    function formatCount(value) {
+        if (value === null || value === undefined) {
+            return "-";
+        }
+        return new Intl.NumberFormat("zh-CN").format(value);
+    }
+
+    function formatDecimal(value, scale) {
+        if (value === null || value === undefined || value === "") {
+            return "-";
+        }
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return String(value);
+        }
+        return new Intl.NumberFormat("zh-CN", {
+            maximumFractionDigits: scale,
+            minimumFractionDigits: 0,
+        }).format(number);
+    }
+
+    function humanizeKey(key) {
+        return String(key || "")
+            .replace(/([A-Z])/g, " $1")
+            .replace(/_/g, " ")
+            .replace(/^./, letter => letter.toUpperCase());
+    }
+
+    function formatValue(value) {
+        if (value === null || value === undefined) {
+            return "-";
+        }
+        if (typeof value === "object") {
+            return JSON.stringify(value);
+        }
+        return String(value);
+    }
+
+    function formatJson(value) {
+        if (value === null || value === undefined || value === "") {
+            return "-";
+        }
+        return JSON.stringify(value, null, 2);
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    loadRuns(true);
+</script>
+</body>
+</html>
