@@ -282,6 +282,20 @@
             font-size: 0.84rem;
         }
 
+        .symbol-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .symbol-link:hover {
+            color: #9ff5ea;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
         .reason-list {
             display: flex;
             flex-wrap: wrap;
@@ -574,7 +588,7 @@
                     <tbody>
                     ${candidates.map(candidate => `
                         <tr>
-                            <td><strong>${escapeHtml(candidate.futuresSymbol || "-")}</strong><br><span class="mono">${escapeHtml(candidate.contractAddress || "-")}</span></td>
+                            <td>${renderFuturesSymbolCell(candidate)}</td>
                             <td>${escapeHtml(candidate.alphaSymbol || candidate.cexCoinName || candidate.alphaId || "-")}<br><span class="mono">${escapeHtml(candidate.chainId || "-")}</span></td>
                             <td>${escapeHtml(formatDecimal(candidate.currentOpenInterestUsdt, 2))}</td>
                             <td>${escapeHtml(formatDecimal(candidate.monthlyPumpPct, 2))}%</td>
@@ -589,6 +603,26 @@
                 </table>
             </div>
         `;
+    }
+
+    function renderFuturesSymbolCell(candidate) {
+        const futuresSymbol = candidate?.futuresSymbol || "";
+        const contractAddress = candidate?.contractAddress || "-";
+        if (!futuresSymbol) {
+            return `<strong>-</strong><br><span class="mono">${escapeHtml(contractAddress)}</span>`;
+        }
+
+        return `
+            <a class="symbol-link" href="${escapeHtml(buildBinanceFuturesUrl(futuresSymbol))}" target="_blank" rel="noopener noreferrer">
+                ${escapeHtml(futuresSymbol)}
+            </a>
+            <br>
+            <span class="mono">${escapeHtml(contractAddress)}</span>
+        `;
+    }
+
+    function buildBinanceFuturesUrl(futuresSymbol) {
+        return `https://www.binance.com/zh-CN/futures/${encodeURIComponent(String(futuresSymbol || "").trim())}`;
     }
 
     function renderHolders(holders) {
